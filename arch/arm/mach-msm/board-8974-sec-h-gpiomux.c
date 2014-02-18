@@ -1587,6 +1587,7 @@ static void msm_gpiomux_wlan_host_wakeup_install(void)
 #endif /* defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) */
 
 #ifdef CONFIG_MFD_MAX77888
+#if 0 // Sensor hub pin
 static struct gpiomux_setting muic_init_cfg = {
     .func = GPIOMUX_FUNC_GPIO,
     .drv = GPIOMUX_DRV_2MA,
@@ -1600,7 +1601,6 @@ static struct gpiomux_setting muic_sleep_cfg = {
     .pull = GPIOMUX_PULL_NONE,
     .dir = GPIOMUX_IN,
 };
-#if 0 // Sensor hub pin
 static struct msm_gpiomux_config msm8974_muic_configs[] __initdata = {
     {
         .gpio = 83, /* IF_PMIC_SCL_1.8V */
