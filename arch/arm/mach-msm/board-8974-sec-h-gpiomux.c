@@ -11,6 +11,8 @@
  *
  */
 
+#ifndef CONFIG_MACH_MONDRIAN
+
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <mach/board.h>
@@ -2151,3 +2153,5 @@ void __init msm_8974_init_gpiomux(void)
 #endif
 
 }
+
+#endif
