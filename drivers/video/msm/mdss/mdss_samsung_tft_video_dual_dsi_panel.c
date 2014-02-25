@@ -40,6 +40,10 @@ static struct mdss_dsi_ctrl_pdata *left_back_up_data;
 
 static int panel_power_state;
 static char board_rev;
+static int lcd_attached = 1;
+static int lcd_id = 0;
+
+int get_lcd_attached(void);
 
 int get_panel_power_state(void)
 {
@@ -138,6 +142,12 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 {
 	struct dcs_cmd_req cmdreq;
 
+	if (get_lcd_attached() == 0)
+	{
+		printk("%s: get_lcd_attached(0)!\n",__func__);
+		return ;
+	}
+
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = pcmds->cmds;
 	cmdreq.cmds_cnt = pcmds->cmd_cnt;
@@ -146,6 +156,8 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 	cmdreq.cb = NULL;
 
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+	if(ctrl->ndx == DSI_CTRL_0)
+		mdss_dsi_cmdlist_put(left_back_up_data, &cmdreq);
 }
 
 static char led_pwm1[2] = {0x51, 0x0};	/* DTYPE_DCS_WRITE1 */
@@ -157,6 +169,12 @@ static struct dsi_cmd_desc backlight_cmd = {
 static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 {
 	struct dcs_cmd_req cmdreq;
+
+	if (get_lcd_attached() == 0)
+	{
+		printk("%s: get_lcd_attached(0)!\n",__func__);
+		return ;
+	}
 
 	pr_debug("%s: level=%d\n", __func__, level);
 
@@ -187,7 +205,7 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	if(ctrl_pdata->ndx == DSI_CTRL_1)
+	if(ctrl_pdata->ndx == DSI_CTRL_0)
 		return;
 
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
@@ -200,23 +218,18 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			   __func__, __LINE__);
 		return;
 	}
-
+	pr_info("%s : dsi index = %d \n", __func__, ctrl_pdata->ndx);
 	pr_info("%s: enable = %d\n", __func__, enable);
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
 	if (enable) {
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
-			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
-			msleep(20);
-			gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
-			msleep(20);
-
 			gpio_set_value((ctrl_pdata->rst_gpio), 1);
-			msleep(20);
+			msleep(5);
 			gpio_set_value((ctrl_pdata->rst_gpio), 0);
-			msleep(20);
+			msleep(12);
 			gpio_set_value((ctrl_pdata->rst_gpio), 1);
-			msleep(20);
+			msleep(12);
 		} else {
 		}
 	} else {
@@ -286,11 +299,12 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 
 	pr_info("%s: ctrl index=%d ++ \n", __func__, ctrl->ndx);
 
-	if (ctrl->on_cmds.cmd_cnt) {
-		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
-	}
 
-	if (ctrl->ndx == DSI_CTRL_1) {
+
+	if (ctrl->ndx == DSI_CTRL_0) {
+		if (ctrl->on_cmds.cmd_cnt) {
+			mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
+		}
 		panel_power_state = 1;
 
 		pwm_backlight_enable();
@@ -308,7 +322,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 			mdss_dsi_panel_bl_ctrl(pdata, RECOVERY_BRIGHTNESS);
 		} else {
 #if defined(CONFIG_CABC_TUNING)
-			CABC_Set_Negative();
+			CABC_Set_Mode();
 #endif
 		}
 	}
@@ -380,6 +394,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		if (dchdr->dlen > len) {
 			pr_err("%s: dtsi cmd=%x error, len=%d",
 				__func__, dchdr->dtype, dchdr->dlen);
+			kfree(buf);
 			return -ENOMEM;
 		}
 		pr_debug("bp : %x, dlen : %x, len : %x",*bp,dchdr->dlen,len);
@@ -446,6 +461,26 @@ static ssize_t mdss_samsung_disp_lcdtype_show(struct device *dev,
 	return strnlen(buf, 100);
 }
 static DEVICE_ATTR(lcd_type, S_IRUGO, mdss_samsung_disp_lcdtype_show, NULL);
+
+static ssize_t store_lux(struct device *dev,
+			    struct device_attribute *dev_attr,
+			    const char *buf, size_t count)
+{
+	int ret;
+	unsigned int input_lux;
+
+	ret = kstrtouint(buf, 10, &input_lux);
+
+	if (ret)
+		return ret;
+
+#if defined(CONFIG_CABC_TUNING)
+	update_lux(input_lux);
+#endif
+
+	return count;
+}
+static DEVICE_ATTR(lux, 0664, NULL, store_lux);
 
 static int mdss_dsi_parse_fbc_params(struct device_node *np,
 				struct mdss_panel_info *panel_info)
@@ -884,6 +919,10 @@ int mdss_dsi_panel_init(struct device_node *node,
 		ctrl_pdata->panel_data.panel_info.cont_splash_enabled = 1;
 	}
 
+	if (get_lcd_attached() == 0) {
+		ctrl_pdata->panel_data.panel_info.cont_splash_enabled = 0;
+	}
+
 	ctrl_pdata->on = mdss_dsi_panel_on;
 	ctrl_pdata->off = mdss_dsi_panel_off;
 	ctrl_pdata->panel_reset = mdss_dsi_panel_reset;
@@ -897,10 +936,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pr_info("%s: dsi_ctrl_1 backup",__func__);
 		left_back_up_data = ctrl_pdata;
 	}
-
-#if defined(CONFIG_CABC_TUNING)
-		cabc_tuning_init(ctrl_pdata);
-#endif
 
 	if(!first_init) {
 		mutex_init(&msd.lock);
@@ -918,8 +953,18 @@ int mdss_dsi_panel_init(struct device_node *node,
 		if (rc)
 			pr_info(" can't create lcd_type sysfs\n");
 
+		rc = sysfs_create_file(&lcd_device->dev.kobj,
+				&dev_attr_lux.attr);
+
+		if (rc)
+			pr_info(" can't create lux sysfs\n");
+
 		first_init = 1;
 	}
+
+#if defined(CONFIG_CABC_TUNING)
+		cabc_tuning_init(ctrl_pdata);
+#endif
 
 	return 0;
 }
@@ -938,6 +983,12 @@ static int atoi(const char *name)
 		}
 	}
 }
+
+int get_samsung_lcd_attached(void)
+{
+	return lcd_attached;
+}
+EXPORT_SYMBOL(get_samsung_lcd_attached);
 
 static int __init mdss_panel_current_hw_rev(char *rev)
 {
@@ -967,3 +1018,38 @@ static int __init current_boot_mode(char *mode)
 	return 1;
 }
 __setup("androidboot.boot_recovery=", current_boot_mode);
+
+static int __init get_lcd_id_cmdline(char *mode)
+{
+	char *pt;
+
+	lcd_id = 0;
+	if( mode == NULL ) return 1;
+	for( pt = mode; *pt != 0; pt++ )
+	{
+		lcd_id <<= 4;
+		switch(*pt)
+		{
+			case '0' ... '9' :
+				lcd_id += *pt -'0';
+			break;
+			case 'a' ... 'f' :
+				lcd_id += 10 + *pt -'a';
+			break;
+			case 'A' ... 'F' :
+				lcd_id += 10 + *pt -'A';
+			break;
+		}
+	}
+	lcd_attached = ((lcd_id&0xFFFFFF)!=0x000000);
+
+#if defined(CONFIG_LCD_FORCE_VIDEO_MODE)
+	lcd_attached = 1;
+#endif
+
+	pr_info( "%s: LCD_ID = 0x%X, lcd_attached =%d", __func__,lcd_id, lcd_attached);
+
+	return 0;
+}
+
+__setup( "lcd_id=0x", get_lcd_id_cmdline );

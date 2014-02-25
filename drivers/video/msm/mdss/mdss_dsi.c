@@ -37,7 +37,8 @@ extern unsigned int system_rev;
 int get_lcd_attached(void);
 
 #if defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || \
-	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL)
+	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || \
+	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)
 
 int get_samsung_lcd_attached(void);
 int get_lcd_panel_res(void);
@@ -123,7 +124,8 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
 	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) \
 	|| defined(CONFIG_MIPI_LCD_S6E3FA0_FORCE_VIDEO_MODE) \
-	|| defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_JS01LTESBM)
+	|| defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_JS01LTESBM) \
+	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 		}
@@ -553,7 +555,8 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	}
 
 	pdata->panel_info.panel_power_on = 1;
-
+#if !defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION) && \
+	!defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)
 	if (get_lcd_attached() == 0) {
 		pr_err("%s : lcd is not attached..\n",__func__);
 
@@ -562,7 +565,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 
 		return -ENODEV;
 	}
-
+#endif
 	ret = mdss_dsi_enable_bus_clocks(ctrl_pdata);
 	if (ret) {
 		pr_err("%s: failed to enable bus clocks. rc=%d\n", __func__,
@@ -1195,11 +1198,13 @@ static int __devinit mdss_dsi_ctrl_probe(struct platform_device *pdev)
 		return -ENOTSUPP;
 	}
 
+#if !defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION) && \
+	!defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)
 	if (get_lcd_attached() == 0) {
 		pr_err("%s : lcd is not attached..\n",__func__);
 		return -ENODEV;
 	}
-
+#endif
 	ctrl_pdata = platform_get_drvdata(pdev);
 	if (!ctrl_pdata) {
 		ctrl_pdata = devm_kzalloc(&pdev->dev,
@@ -1597,6 +1602,15 @@ int dsi_panel_device_register(struct device_node *pan_node,
 
 	pr_err("%s:%d, Disp_en_gpio (%d)",__func__, __LINE__,ctrl_pdata->disp_en_gpio );
 
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)
+	if (get_lcd_attached() == 0) {
+		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+			pr_info("%s : Set Low LCD Enable GPIO \n", __func__);
+			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
+		}
+	}
+#endif
+
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 		pr_err("%s:%d, Disp_en gpio not specified\n",
 						__func__, __LINE__);
@@ -1826,7 +1840,8 @@ module_exit(mdss_dsi_driver_cleanup);
 int get_lcd_attached(void)
 {
 #if defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || \
-	defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL)
+	defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || \
+	defined (CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)
 	return get_samsung_lcd_attached();
 #else
 	return 1;
