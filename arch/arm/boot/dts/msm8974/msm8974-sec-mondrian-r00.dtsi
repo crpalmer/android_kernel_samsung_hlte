@@ -178,7 +178,7 @@
 			battery,input_current_limit = <1900 460 460 1900 460 900 1000 460 460 1000 650 1900 1900 460 1300 300 700 1300 300 1000 1900 460 460>;
 			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 1300 300 700 1300 300 1000 2100 0 0>;
 			battery,full_check_current_1st = <350 0 350 350 350 350 350 350 0 350 350 350 350 0 350 350 350 350 350 350 350 0 0>;
-			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
+			battery,full_check_current_2nd = <1200 0 1200 1200 1200 1200 1200 1200 0 1200 1200 1200 1200 0 1200 1200 1200 1200 1200 1200 1200 0 0>;
 		};
 	};
 
@@ -285,6 +285,7 @@
 			gp2a030a,irq_gpio = <&msmgpio 74 0x0>;
 			gp2a030a-vcc-supply = <&pm8941_l18>;
 			gp2a030a-lvs1-supply = <&pm8941_lvs1>;
+			gp2a030a,con_gpio = <0xf 0x5 0x0>;
 			qcom,gp2a030a-vcc-voltage-level = <2850000 2850000>;
 			qcom,gp2a030a-vcc-always-on;
 		};
@@ -322,6 +323,8 @@
 	/* BLSP#9 */
 	i2c@f9965000 {
 		status = "okay";
+		qcom,scl-gpio = <&msmgpio 0x34 0x0>;
+		qcom,sda-gpio = <&msmgpio 0x33 0x0>;
 		sec-fuelgauge@36 {
 			compatible = "sec-fuelgauge,i2c";
 			reg = <0x36>;
@@ -330,7 +333,7 @@
 			fuelgauge,capacity_max_margin = <50>;
 			fuelgauge,capacity_min = <0>;
 			fuelgauge,capacity_calculation_type = <7>;
-			fuelgauge,fuel_alert_soc = <2>;
+			fuelgauge,fuel_alert_soc = <1>;
 			fuelgauge,jig_gpio = <&msmgpio 76 0x00>;
 		};
 	};
@@ -357,6 +360,7 @@
 	/* BLSP#12 */
 	i2c@f9968000 {
 		status = "okay";
+		qcom,i2c-bus-freq = <400000>;
 		mpu9250@68 {
 			compatible = "mpu9250";
 			reg = <0x68>;
